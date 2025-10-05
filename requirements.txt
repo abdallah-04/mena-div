@@ -9,3 +9,10 @@ opencv-python
 pytesseract
 python-dotenv
 ollama
+streamlit
+PyMuPDF
+python-docx
+opencv-python
+pytesseract
+python-dotenv
+

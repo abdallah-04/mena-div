@@ -1,12 +1,10 @@
-# ====== Imports ======
-from extractor import extract_text
 import fitz  
 from docx import Document
 import os
-import subprocess  # Use subprocess to call Ollama CLI
+import subprocess  
 import json
+import tempfile
 
-# ====== CV Extraction (keep as is) ======
 def extract_text_from_docx(file_path):
     doc = Document(file_path)
     text = "\n".join([p.text for p in doc.paragraphs])
@@ -31,22 +29,25 @@ def extract_text(file_path):
         raise ValueError("Unsupported file type. Please use PDF or DOCX.")
 
 
-# ====== LLaMA Offline Analysis via CLI ======
-import subprocess
-import tempfile
-import os
-
 def analyze_with_llama(cv_text, job_description, model="llama3"):
     prompt = f"""
-You are a CV analyzer AI. Extract and compare data from the following CV and job description.
+You are a strict CV extractor and job matcher.
 
-Return the result as JSON with this structure:
+Your job:
+1. Extract ONLY information that *explicitly appears* in the CV text — do NOT infer or guess anything.
+2. If something (like name or experience) cannot be clearly found, set it to null.
+3. Never mix or invent data.
+4. Extract skills *only* if the exact words appear in the CV text.
+5. Return all output as **valid JSON only**, no explanations.
+
+JSON format:
 {{
-  "name": "",
-  "skills": [],
-  "achievements": [],
-  "match_score": "",
-  "notes": ""
+  "name": "<exact name or null>",
+  "skills": ["<skill1>", "<skill2>", ...],
+  "years_of_experience": <number or null>,
+  "job_title": "<job title from JD or null>",
+  "match_score": <integer 0-10>,
+  "notes": "<explain briefly how the score was computed>"
 }}
 
 CV Text:
@@ -56,13 +57,11 @@ Job Description:
 {job_description}
 """
 
-    # Create a temporary file with the prompt
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
         f.write(prompt)
         temp_path = f.name
 
     try:
-        # Run Ollama with the file as input
         cmd = f'ollama run {model} < "{temp_path}"'
         result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
 
@@ -72,30 +71,4 @@ Job Description:
         return result.stdout.strip()
 
     finally:
-        # Clean up temp file
         os.remove(temp_path)
-
-# ====== MAIN PROGRAM ======
-if __name__ == "__main__":
-    file_path = r"C:\Users\abdal\OneDrive\Desktop\mena-div\Copy of  Resume.pdf"
-
-    try:
-        # Step 1: Extract text
-        cv_text = extract_text(file_path)
-        print("✅ CV text extracted successfully!\n")
-        print("Extracted CV Text:\n", cv_text)
-
-        # Step 2: HR job description
-        job_description = """
-We are looking for a Software Engineer skilled in Python, Machine Learning, and problem-solving.
-"""
-
-        # Step 3: Analyze with LLaMA
-        print("\nAnalyzing CV with local LLaMA model...")
-        result = analyze_with_llama(cv_text, job_description)
-
-        print("\n===== LLaMA Output =====\n")
-        print(result)
-
-    except Exception as e:
-        print(f"Error: {e}")
